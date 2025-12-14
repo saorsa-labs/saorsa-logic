@@ -137,7 +137,11 @@ impl EntangledIdComponents {
 /// assert_eq!(id.len(), 32);
 /// ```
 #[must_use]
-pub fn derive_entangled_id(public_key: &[u8], binary_hash: &[u8; HASH_SIZE], nonce: u64) -> [u8; ENTANGLED_ID_SIZE] {
+pub fn derive_entangled_id(
+    public_key: &[u8],
+    binary_hash: &[u8; HASH_SIZE],
+    nonce: u64,
+) -> [u8; ENTANGLED_ID_SIZE] {
     let mut hasher = Hasher::new();
 
     // Include full public key in hash (not pre-hashed, for maximum binding)
@@ -157,7 +161,9 @@ pub fn derive_entangled_id(public_key: &[u8], binary_hash: &[u8; HASH_SIZE], non
 /// This variant is useful when passing data through zkVM where
 /// the components are already structured.
 #[must_use]
-pub fn derive_entangled_id_from_components(components: &EntangledIdComponents) -> [u8; ENTANGLED_ID_SIZE] {
+pub fn derive_entangled_id_from_components(
+    components: &EntangledIdComponents,
+) -> [u8; ENTANGLED_ID_SIZE] {
     let mut hasher = Hasher::new();
 
     // Use the pre-hashed public key
@@ -236,7 +242,10 @@ pub fn verify_binary_allowlist(
 ///
 /// This is used for DHT routing when EntangledId becomes the routing address.
 #[must_use]
-pub fn xor_distance(a: &[u8; ENTANGLED_ID_SIZE], b: &[u8; ENTANGLED_ID_SIZE]) -> [u8; ENTANGLED_ID_SIZE] {
+pub fn xor_distance(
+    a: &[u8; ENTANGLED_ID_SIZE],
+    b: &[u8; ENTANGLED_ID_SIZE],
+) -> [u8; ENTANGLED_ID_SIZE] {
     let mut result = [0u8; ENTANGLED_ID_SIZE];
     for i in 0..ENTANGLED_ID_SIZE {
         result[i] = a[i] ^ b[i];
@@ -264,10 +273,11 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 ///
 /// This structure contains all the data needed to generate a zkVM proof
 /// of correct EntangledId derivation.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationWitness {
     /// The full public key (private to the prover).
-    pub public_key: Vec<u8>,
+    pub public_key: alloc::vec::Vec<u8>,
 
     /// Hash of the running binary.
     pub binary_hash: [u8; HASH_SIZE],
@@ -276,10 +286,11 @@ pub struct AttestationWitness {
     pub nonce: u64,
 }
 
+#[cfg(feature = "alloc")]
 impl AttestationWitness {
     /// Create a new attestation witness.
     #[must_use]
-    pub fn new(public_key: Vec<u8>, binary_hash: [u8; HASH_SIZE], nonce: u64) -> Self {
+    pub fn new(public_key: alloc::vec::Vec<u8>, binary_hash: [u8; HASH_SIZE], nonce: u64) -> Self {
         Self {
             public_key,
             binary_hash,
@@ -428,14 +439,12 @@ mod tests {
 
     #[test]
     fn test_attestation_witness_derive() {
-        let witness = AttestationWitness::new(
-            vec![0u8; ML_DSA_65_PUBLIC_KEY_SIZE],
-            [1u8; HASH_SIZE],
-            42,
-        );
+        let witness =
+            AttestationWitness::new(vec![0u8; ML_DSA_65_PUBLIC_KEY_SIZE], [1u8; HASH_SIZE], 42);
 
         let id = witness.derive_id();
-        let expected = derive_entangled_id(&witness.public_key, &witness.binary_hash, witness.nonce);
+        let expected =
+            derive_entangled_id(&witness.public_key, &witness.binary_hash, witness.nonce);
 
         assert_eq!(id, expected);
     }

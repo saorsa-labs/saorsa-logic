@@ -162,10 +162,11 @@ pub fn verify_keyed_hash(
 /// A vector of (chunk_hash, chunk_data) pairs.
 #[cfg(feature = "alloc")]
 #[must_use]
-pub fn chunk_and_hash(data: &[u8], chunk_size: usize) -> alloc::vec::Vec<([u8; CONTENT_HASH_SIZE], alloc::vec::Vec<u8>)> {
-    use alloc::vec::Vec;
-
-    let mut result = Vec::new();
+pub fn chunk_and_hash(
+    data: &[u8],
+    chunk_size: usize,
+) -> alloc::vec::Vec<([u8; CONTENT_HASH_SIZE], alloc::vec::Vec<u8>)> {
+    let mut result = alloc::vec::Vec::new();
 
     for chunk in data.chunks(chunk_size) {
         let hash = compute_content_hash(chunk);
@@ -210,6 +211,7 @@ pub enum StorageOp {
 /// Witness data for storage operation proofs.
 ///
 /// Contains all information needed to verify a storage operation in zkVM.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct StorageWitness {
     /// Type of operation
@@ -315,7 +317,10 @@ mod tests {
         let hash1 = compute_prefixed_hash(b"chunk", data);
         let hash2 = compute_prefixed_hash(b"manifest", data);
 
-        assert_ne!(hash1, hash2, "different prefixes should produce different hashes");
+        assert_ne!(
+            hash1, hash2,
+            "different prefixes should produce different hashes"
+        );
     }
 
     #[test]

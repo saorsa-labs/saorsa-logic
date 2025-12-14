@@ -60,7 +60,10 @@ impl fmt::Display for LogicError {
                 expected,
                 actual,
             } => {
-                write!(f, "invalid length for {field}: expected {expected}, got {actual}")
+                write!(
+                    f,
+                    "invalid length for {field}: expected {expected}, got {actual}"
+                )
             }
             Self::HashMismatch => write!(f, "hash verification failed"),
             Self::SignatureInvalid => write!(f, "signature verification failed"),

@@ -61,7 +61,10 @@ pub const MERKLE_HASH_SIZE: usize = 32;
 /// Uses domain separation to prevent second preimage attacks:
 /// `parent = BLAKE3(0x01 || left || right)`
 #[must_use]
-pub fn hash_nodes(left: &[u8; MERKLE_HASH_SIZE], right: &[u8; MERKLE_HASH_SIZE]) -> [u8; MERKLE_HASH_SIZE] {
+pub fn hash_nodes(
+    left: &[u8; MERKLE_HASH_SIZE],
+    right: &[u8; MERKLE_HASH_SIZE],
+) -> [u8; MERKLE_HASH_SIZE] {
     let mut hasher = Hasher::new();
     hasher.update(&[0x01]); // Internal node prefix
     hasher.update(left);
@@ -84,6 +87,7 @@ pub fn hash_leaf(data: &[u8]) -> [u8; MERKLE_HASH_SIZE] {
 ///
 /// Contains the sibling hashes and path needed to verify
 /// that a leaf is included in a tree with a given root.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MerkleProof {
     /// Sibling hashes from leaf to root.
@@ -93,18 +97,22 @@ pub struct MerkleProof {
 }
 
 #[cfg(feature = "alloc")]
-extern crate alloc;
-
-#[cfg(feature = "alloc")]
 impl MerkleProof {
     /// Create a new Merkle proof.
     #[must_use]
-    pub fn new(siblings: alloc::vec::Vec<[u8; MERKLE_HASH_SIZE]>, path: alloc::vec::Vec<bool>) -> Self {
+    pub fn new(
+        siblings: alloc::vec::Vec<[u8; MERKLE_HASH_SIZE]>,
+        path: alloc::vec::Vec<bool>,
+    ) -> Self {
         Self { siblings, path }
     }
 
     /// Verify this proof against a leaf and root.
-    pub fn verify(&self, leaf_hash: &[u8; MERKLE_HASH_SIZE], root: &[u8; MERKLE_HASH_SIZE]) -> LogicResult<()> {
+    pub fn verify(
+        &self,
+        leaf_hash: &[u8; MERKLE_HASH_SIZE],
+        root: &[u8; MERKLE_HASH_SIZE],
+    ) -> LogicResult<()> {
         verify_merkle_proof(leaf_hash, &self.siblings, &self.path, root)
     }
 
@@ -182,8 +190,6 @@ pub fn compute_root_from_proof(
 #[cfg(feature = "alloc")]
 #[must_use]
 pub fn build_tree_root(leaves: &[[u8; MERKLE_HASH_SIZE]]) -> [u8; MERKLE_HASH_SIZE] {
-    use alloc::vec::Vec;
-
     if leaves.is_empty() {
         return [0u8; MERKLE_HASH_SIZE];
     }
@@ -193,7 +199,7 @@ pub fn build_tree_root(leaves: &[[u8; MERKLE_HASH_SIZE]]) -> [u8; MERKLE_HASH_SI
     }
 
     // Pad to power of 2 if needed
-    let mut padded = Vec::from(leaves);
+    let mut padded = alloc::vec::Vec::from(leaves);
     while !padded.len().is_power_of_two() {
         padded.push([0u8; MERKLE_HASH_SIZE]);
     }
@@ -201,7 +207,7 @@ pub fn build_tree_root(leaves: &[[u8; MERKLE_HASH_SIZE]]) -> [u8; MERKLE_HASH_SI
     let mut current_level = padded;
 
     while current_level.len() > 1 {
-        let mut next_level = Vec::with_capacity(current_level.len() / 2);
+        let mut next_level = alloc::vec::Vec::with_capacity(current_level.len() / 2);
 
         for pair in current_level.chunks(2) {
             next_level.push(hash_nodes(&pair[0], &pair[1]));
@@ -226,20 +232,18 @@ pub fn build_tree_root(leaves: &[[u8; MERKLE_HASH_SIZE]]) -> [u8; MERKLE_HASH_SI
 #[cfg(feature = "alloc")]
 #[must_use]
 pub fn generate_proof(leaves: &[[u8; MERKLE_HASH_SIZE]], index: usize) -> Option<MerkleProof> {
-    use alloc::vec::Vec;
-
     if leaves.is_empty() || index >= leaves.len() {
         return None;
     }
 
     // Pad to power of 2
-    let mut padded = Vec::from(leaves);
+    let mut padded = alloc::vec::Vec::from(leaves);
     while !padded.len().is_power_of_two() {
         padded.push([0u8; MERKLE_HASH_SIZE]);
     }
 
-    let mut siblings = Vec::new();
-    let mut path = Vec::new();
+    let mut siblings = alloc::vec::Vec::new();
+    let mut path = alloc::vec::Vec::new();
     let mut current_index = index;
     let mut current_level = padded;
 
@@ -255,7 +259,7 @@ pub fn generate_proof(leaves: &[[u8; MERKLE_HASH_SIZE]], index: usize) -> Option
         path.push(is_right);
 
         // Build next level
-        let mut next_level = Vec::with_capacity(current_level.len() / 2);
+        let mut next_level = alloc::vec::Vec::with_capacity(current_level.len() / 2);
         for pair in current_level.chunks(2) {
             next_level.push(hash_nodes(&pair[0], &pair[1]));
         }
@@ -348,9 +352,7 @@ mod tests {
 
     #[test]
     fn test_build_tree_four_leaves() {
-        let leaves: Vec<[u8; 32]> = (0..4)
-            .map(|i| hash_leaf(&[i as u8]))
-            .collect();
+        let leaves: Vec<[u8; 32]> = (0..4).map(|i| hash_leaf(&[i as u8])).collect();
 
         let root = build_tree_root(&leaves);
 
@@ -364,24 +366,23 @@ mod tests {
 
     #[test]
     fn test_generate_and_verify_proof() {
-        let leaves: Vec<[u8; 32]> = (0..4)
-            .map(|i| hash_leaf(&[i as u8]))
-            .collect();
+        let leaves: Vec<[u8; 32]> = (0..4).map(|i| hash_leaf(&[i as u8])).collect();
 
         let root = build_tree_root(&leaves);
 
         // Generate and verify proof for each leaf
         for (i, leaf) in leaves.iter().enumerate() {
             let proof = generate_proof(&leaves, i).expect("proof should exist");
-            assert!(proof.verify(leaf, &root).is_ok(), "proof for leaf {i} should be valid");
+            assert!(
+                proof.verify(leaf, &root).is_ok(),
+                "proof for leaf {i} should be valid"
+            );
         }
     }
 
     #[test]
     fn test_proof_invalid_root() {
-        let leaves: Vec<[u8; 32]> = (0..4)
-            .map(|i| hash_leaf(&[i as u8]))
-            .collect();
+        let leaves: Vec<[u8; 32]> = (0..4).map(|i| hash_leaf(&[i as u8])).collect();
 
         let proof = generate_proof(&leaves, 0).expect("proof should exist");
         let wrong_root = [0u8; MERKLE_HASH_SIZE];
@@ -394,9 +395,7 @@ mod tests {
 
     #[test]
     fn test_proof_invalid_leaf() {
-        let leaves: Vec<[u8; 32]> = (0..4)
-            .map(|i| hash_leaf(&[i as u8]))
-            .collect();
+        let leaves: Vec<[u8; 32]> = (0..4).map(|i| hash_leaf(&[i as u8])).collect();
 
         let root = build_tree_root(&leaves);
         let proof = generate_proof(&leaves, 0).expect("proof should exist");
@@ -410,16 +409,17 @@ mod tests {
 
     #[test]
     fn test_compute_root_from_proof() {
-        let leaves: Vec<[u8; 32]> = (0..8)
-            .map(|i| hash_leaf(&[i as u8]))
-            .collect();
+        let leaves: Vec<[u8; 32]> = (0..8).map(|i| hash_leaf(&[i as u8])).collect();
 
         let root = build_tree_root(&leaves);
 
         for (i, leaf) in leaves.iter().enumerate() {
             let proof = generate_proof(&leaves, i).expect("proof should exist");
             let computed_root = proof.compute_root(leaf);
-            assert_eq!(computed_root, root, "computed root should match for leaf {i}");
+            assert_eq!(
+                computed_root, root,
+                "computed root should match for leaf {i}"
+            );
         }
     }
 
